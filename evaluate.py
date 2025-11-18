@@ -81,7 +81,8 @@ def ssim_heatmap(generated: Image.Image, reference: Image.Image) -> Tuple[Image.
 def evaluate_all(generated: Image.Image, references: Dict[str, Image.Image]) -> Dict[str, float]:
     """Compute all metrics with stubs and return a flat dictionary.
 
-    * ArcFace-style identity uses the photo/montage reference when present.
+    * ArcFace-style identity, VQA, CLIP, and Attribute-F1 compare against the
+      real photo montage reference when available to reflect identity fidelity.
     * Distortion visualization prefers sketch references to better match the
       generated montage modality; if no sketch exists, it falls back to the
       montage reference. The chosen reference type is returned for logging.
@@ -90,7 +91,7 @@ def evaluate_all(generated: Image.Image, references: Dict[str, Image.Image]) -> 
     montage_ref = references.get("montage")
     sketch_ref = references.get("sketch")
 
-    identity_ref = montage_ref or sketch_ref or generated
+    identity_ref = montage_ref or generated
 
     if sketch_ref is not None:
         heatmap_ref = sketch_ref

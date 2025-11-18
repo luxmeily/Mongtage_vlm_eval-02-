@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PIL import Image
@@ -128,6 +129,24 @@ def _try_load_with_extensions(base_path: str, exts: List[str]) -> Optional[Image
     return None
 
 
+def _load_prefixed_image(folder: Path, prefix: str, exts: List[str]) -> Optional[Image.Image]:
+    """Load the first image whose stem starts with the given prefix.
+
+    Sketch assets are frequently stored as ``{org_id}_{sketch_id}.jpg``; this helper
+    allows finding the matching file without knowing the trailing sketch_id.
+    """
+
+    if not folder.exists() or not folder.is_dir():
+        return None
+
+    for ext in exts:
+        for path in sorted(folder.glob(f"{prefix}*{ext}")):
+            img = _find_image(str(path))
+            if img is not None:
+                return img
+    return None
+
+
 def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Optional[Image.Image]]:
     """Load ground-truth montage and sketch images if available.
 
@@ -138,16 +157,21 @@ def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Opt
 
     montage_base = os.path.join("data", "images", "montage", f"{person_id}")
     org_sketch_base = os.path.join("data", "images", "org_sketch", f"{person_id}")
-    level_sketch_base = (
-        os.path.join("data", "images", "sketch", level, f"{person_id}")
-        if level
-        else None
-    )
 
-    sketch_image = None
-    if level_sketch_base:
-        sketch_image = _try_load_with_extensions(level_sketch_base, [".png", ".jpg", ".jpeg"])
-    sketch_image = sketch_image or _try_load_with_extensions(org_sketch_base, [".png", ".jpg", ".jpeg"])
+    level_sketch_folder = Path("data") / "images" / "sketch"
+    level_sketch_image: Optional[Image.Image] = None
+    if level:
+        level_folder = level_sketch_folder / level
+        # Try level sketches that include sketch_id suffixes, then plain stem.
+        level_sketch_image = _load_prefixed_image(level_folder, person_id, [".png", ".jpg", ".jpeg"])
+        if level_sketch_image is None:
+            level_sketch_image = _try_load_with_extensions(
+                str(level_folder / person_id), [".png", ".jpg", ".jpeg"]
+            )
+
+    sketch_image = level_sketch_image or _try_load_with_extensions(
+        org_sketch_base, [".png", ".jpg", ".jpeg"]
+    )
 
     return {
         "montage": _try_load_with_extensions(montage_base, [".png", ".jpg", ".jpeg"]),
