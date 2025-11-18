@@ -9,16 +9,22 @@ from __future__ import annotations
 
 import os
 import logging
+from functools import lru_cache
 from typing import Dict, List, Optional
 
-# Torch is optional in lightweight environments; guard import to avoid
-# crashing when only stub generation is desired.
-try:  # pragma: no cover - small import guard
-    import torch  # type: ignore
-except Exception:  # ImportError or CUDA-related errors
-    torch = None
-
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _get_torch():  # pragma: no cover - import helper
+    """Import torch lazily so environments without it stay runnable."""
+
+    try:
+        import importlib
+
+        return importlib.import_module("torch")  # type: ignore
+    except Exception:
+        return None
 
 
 def load_qwen() -> Dict[str, str]:
@@ -30,7 +36,8 @@ def load_qwen() -> Dict[str, str]:
     environment.
     """
 
-    device = "cuda" if torch and torch.cuda.is_available() else "cpu"
+    torch_mod = _get_torch()
+    device = "cuda" if torch_mod and torch_mod.cuda.is_available() else "cpu"
     candidates = [
         "Qwen/Qwen2-VL-7B-Instruct",
         "Qwen/Qwen2-VL-2B-Instruct",
@@ -68,9 +75,10 @@ def get_available_models() -> List[str]:
 
     names: List[str] = []
 
-    if torch is None:
+    torch_mod = _get_torch()
+    if torch_mod is None:
         logger.warning(
-            "PyTorch is not installed; skipping Qwen-VL. Install torch to enable GPU inference."
+            "PyTorch is not installed; skipping Qwen-VL. Install torch (e.g., `pip install torch --extra-index-url https://download.pytorch.org/whl/cu121`) to enable GPU inference."
         )
     else:
         try:
