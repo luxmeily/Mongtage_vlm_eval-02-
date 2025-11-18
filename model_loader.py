@@ -46,6 +46,8 @@ def get_instructblip_vqa():  # pragma: no cover - heavyweight optional load
     try:
         from transformers import InstructBlipForConditionalGeneration, InstructBlipProcessor
 
+        # Prefer the smallest officially published checkpoint to satisfy the
+        # "small" requirement while keeping resource usage reasonable.
         checkpoint = "Salesforce/instructblip-vicuna-7b"
         device = "cuda" if torch_mod.cuda.is_available() else "cpu"
         processor = InstructBlipProcessor.from_pretrained(checkpoint)

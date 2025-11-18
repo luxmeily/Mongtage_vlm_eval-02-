@@ -44,6 +44,10 @@ def _append_csv(path: Path, headers: List[str], row: Dict[str, object]) -> None:
 
 def run_pipeline(seed: int = 1234) -> None:
     _ensure_dirs()
+    # Load InstructBLIP VQA model once at startup as required.
+    from model_loader import get_instructblip_vqa
+
+    get_instructblip_vqa()
     persons = _list_persons()
     available_models = get_available_models()
 

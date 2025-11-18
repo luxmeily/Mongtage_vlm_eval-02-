@@ -97,24 +97,70 @@ def parse_json_attributes(json_data: Dict[str, object]) -> Dict[str, str]:
     }
 
 
-def _normalize_answer(value: str) -> str:
-    return value.strip().lower() if value else ""
+def _canonicalize(attr: str, value: str) -> str:
+    """Normalize both GT and predictions into comparable Korean labels."""
 
-
-def _normalize_prediction(attr: str, text: str) -> str:
-    """Map free-form VQA text answers into comparable labels."""
-
-    if not text:
+    if not value:
         return ""
 
-    t = text.strip().lower()
-    # gender
+    text = value.strip().lower()
+
+    # Shared size vocab
+    size_map = {
+        "small": "작다",
+        "little": "작다",
+        "tiny": "작다",
+        "작": "작다",
+        "중간": "보통",
+        "보통": "보통",
+        "average": "보통",
+        "medium": "보통",
+        "크": "크다",
+        "big": "크다",
+        "large": "크다",
+    }
+
+    yes_map = {"yes": "yes", "예": "yes", "맞": "yes", "그렇": "yes"}
+    no_map = {"no": "no", "아니": "no"}
+
+    def match_map(src_map: dict) -> str:
+        for key, canon in src_map.items():
+            if key in text:
+                return canon
+        return ""
+
     if attr == "gender":
-        if "남" in t or "male" in t or t.startswith("m"):
+        male = {"남", "male", "m"}
+        female = {"여", "female", "f"}
+        if any(tok in text for tok in male):
             return "m"
-        if "여" in t or "female" in t or t.startswith("f"):
+        if any(tok in text for tok in female):
             return "f"
-    return t
+        return text
+
+    if attr.endswith("size") or attr in {"eye_size", "mouth_size", "face_size", "nose_size"}:
+        mapped = match_map(size_map)
+        return mapped if mapped else text
+
+    if attr in {"nose_height", "eye_distance", "eye_slant", "mouth_thick", "brow_thick"}:
+        mapped = match_map(size_map)
+        return mapped if mapped else text
+
+    if attr == "mouth_side":
+        if "올라" in text or "up" in text:
+            return "올라감"
+        if "내려" in text or "down" in text:
+            return "내려감"
+        return text
+
+    yn = match_map(yes_map)
+    if yn:
+        return yn
+    yn = match_map(no_map)
+    if yn:
+        return yn
+
+    return text
 
 
 def _generate_questions(gt_attrs: Dict[str, str]) -> Dict[str, str]:
@@ -179,11 +225,14 @@ def vqa_accuracy(generated: Image.Image, json_data: Dict[str, object]) -> Dict[s
 
     results: Dict[str, float] = {}
     for key, gt_val in gt_attrs.items():
-        pred_val = _normalize_prediction(key, raw_answers.get(key, ""))
-        if not gt_val:
+        gt_norm = _canonicalize(key, gt_val)
+        pred_norm = _canonicalize(key, raw_answers.get(key, ""))
+
+        if not gt_norm:
             results[f"vqa_{key}"] = 0.0
             continue
-        results[f"vqa_{key}"] = 1.0 if pred_val and pred_val == _normalize_answer(gt_val) else 0.0
+
+        results[f"vqa_{key}"] = 1.0 if pred_norm and pred_norm == gt_norm else 0.0
 
     total = sum(results.values()) / len(gt_attrs) if gt_attrs else 0.0
     results["vqa_total"] = total
