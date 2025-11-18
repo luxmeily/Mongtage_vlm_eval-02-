@@ -27,6 +27,45 @@ def _get_torch():  # pragma: no cover - import helper
         return None
 
 
+@lru_cache(maxsize=1)
+def get_instructblip_vqa():  # pragma: no cover - heavyweight optional load
+    """Load the smallest InstructBLIP checkpoint once for VQA.
+
+    The loader is defensive: if dependencies or weights are unavailable, it
+    returns a stub bundle so the pipeline remains runnable while still
+    honoring the requirement to use InstructBLIP when possible.
+    """
+
+    torch_mod = _get_torch()
+    if torch_mod is None:
+        logger.warning(
+            "PyTorch missing; VQA will fall back to a stub instead of InstructBLIP."
+        )
+        return {"model": None, "processor": None, "device": "cpu", "available": False}
+
+    try:
+        from transformers import InstructBlipForConditionalGeneration, InstructBlipProcessor
+
+        checkpoint = "Salesforce/instructblip-vicuna-7b"
+        device = "cuda" if torch_mod.cuda.is_available() else "cpu"
+        processor = InstructBlipProcessor.from_pretrained(checkpoint)
+        model = InstructBlipForConditionalGeneration.from_pretrained(checkpoint)
+        model.to(device)
+        model.eval()
+        return {
+            "model": model,
+            "processor": processor,
+            "device": device,
+            "available": True,
+        }
+    except Exception as exc:  # pragma: no cover - best effort load
+        logger.warning(
+            "Failed to load InstructBLIP for VQA; using stub predictions instead (%s)",
+            exc,
+        )
+        return {"model": None, "processor": None, "device": "cpu", "available": False}
+
+
 def load_qwen() -> Dict[str, str]:
     """Attempt to load a Qwen-VL checkpoint.
 
