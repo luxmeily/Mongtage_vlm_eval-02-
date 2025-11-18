@@ -60,6 +60,7 @@ def run_pipeline(seed: int = 1234) -> None:
         "ssim",
         "image_path",
         "heatmap_path",
+        "heatmap_ref",
     ]
 
     prompts_headers = ["person", "level", "prompt_type", "model", "run", "prompt"]
@@ -112,6 +113,7 @@ def run_pipeline(seed: int = 1234) -> None:
                             "ssim": metrics["ssim"],
                             "image_path": str(image_path),
                             "heatmap_path": str(heatmap_path),
+                            "heatmap_ref": metrics.get("heatmap_ref_type"),
                         }
 
                         _append_csv(OUTPUT_DIR / "metrics.csv", metrics_headers, metric_row)
