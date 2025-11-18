@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 from pathlib import Path
 from typing import Dict, List
 
@@ -43,11 +44,21 @@ def _append_csv(path: Path, headers: List[str], row: Dict[str, object]) -> None:
 
 
 def run_pipeline(seed: int = 1234) -> None:
+    logging.basicConfig(level=logging.INFO)
+
     _ensure_dirs()
     # Load InstructBLIP VQA model once at startup as required.
     from model_loader import get_instructblip_vqa
 
-    get_instructblip_vqa()
+    vqa_bundle = get_instructblip_vqa()
+    if vqa_bundle.get("available"):
+        logging.info(
+            "InstructBLIP VQA loaded (%s) on device %s", "Salesforce/instructblip-vicuna-7b", vqa_bundle.get("device")
+        )
+    else:
+        logging.info(
+            "InstructBLIP VQA unavailable; continuing with stubbed VQA answers so the pipeline remains runnable."
+        )
     persons = _list_persons()
     available_models = get_available_models()
 
