@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PIL import Image
@@ -30,21 +31,20 @@ def load_json(path: str) -> Dict[str, Any]:
 
 
 def _remove_nested_description(obj: Any) -> Any:
-    """Recursively remove description fields according to the spec.
+    """Recursively remove description-style natural language fields.
 
-    Rules (finalized):
-    - Drop description.<part>.description for face/hairstyle/eyebrows/eyes/
-      nose/mouth/neck/wrinkle.
-    - Drop description.feature.description, description.feature.mustache,
-      and description.feature.sideburns.
-    - Preserve every other field, including info.*, sketch_info, and
-      org_sketch_info.
+    The finalized spec requires that JSON prompts keep the structural keys
+    intact while stripping natural-language description fields. Specifically:
+
+    - Remove any ``description`` string values (e.g., ``description.face.description``).
+    - Within ``feature`` blocks, also drop ``mustache`` and ``sideburns`` keys.
+    - Preserve all other keys such as ``info.*``, ``sketch_info``, and
+      ``org_sketch_info``.
     """
 
     if isinstance(obj, dict):
         cleaned: Dict[str, Any] = {}
         for key, value in obj.items():
-            # Handle the feature sub-structure separately.
             if key == "feature" and isinstance(value, dict):
                 feature_cleaned = {
                     k: v
@@ -54,9 +54,7 @@ def _remove_nested_description(obj: Any) -> Any:
                 cleaned[key] = _remove_nested_description(feature_cleaned)
                 continue
 
-            # Remove description field inside known parts.
             if key == "description" and isinstance(value, str):
-                # Skip any plain string description fields.
                 continue
 
             cleaned[key] = _remove_nested_description(value)
@@ -120,13 +118,63 @@ def _find_image(path: str) -> Optional[Image.Image]:
         return None
 
 
-def load_gt_images(person_id: str) -> Dict[str, Optional[Image.Image]]:
-    """Load ground-truth montage and sketch images if available."""
+def _try_load_with_extensions(base_path: str, exts: List[str]) -> Optional[Image.Image]:
+    """Load an image by trying multiple extensions in order."""
 
-    montage_path = os.path.join("data", "images", "montage", f"{person_id}.png")
-    sketch_path = os.path.join("data", "images", "org_sketch", f"{person_id}.png")
+    for ext in exts:
+        candidate = f"{base_path}{ext}"
+        img = _find_image(candidate)
+        if img is not None:
+            return img
+    return None
+
+
+def _load_prefixed_image(folder: Path, prefix: str, exts: List[str]) -> Optional[Image.Image]:
+    """Load the first image whose stem starts with the given prefix.
+
+    Sketch assets are frequently stored as ``{org_id}_{sketch_id}.jpg``; this helper
+    allows finding the matching file without knowing the trailing sketch_id.
+    """
+
+    if not folder.exists() or not folder.is_dir():
+        return None
+
+    for ext in exts:
+        for path in sorted(folder.glob(f"{prefix}*{ext}")):
+            img = _find_image(str(path))
+            if img is not None:
+                return img
+    return None
+
+
+def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Optional[Image.Image]]:
+    """Load ground-truth montage and sketch images if available.
+
+    Args:
+        person_id: Identifier matching the JSON/GT filenames.
+        level: Optional level (L/M/H) to search level-specific sketch images.
+    """
+
+    montage_base = os.path.join("data", "images", "montage", f"{person_id}")
+    org_sketch_base = os.path.join("data", "images", "org_sketch", f"{person_id}")
+
+    level_sketch_folder = Path("data") / "images" / "sketch"
+    level_sketch_image: Optional[Image.Image] = None
+    if level:
+        level_folder = level_sketch_folder / level
+        # Try level sketches that include sketch_id suffixes, then plain stem.
+        level_sketch_image = _load_prefixed_image(level_folder, person_id, [".png", ".jpg", ".jpeg"])
+        if level_sketch_image is None:
+            level_sketch_image = _try_load_with_extensions(
+                str(level_folder / person_id), [".png", ".jpg", ".jpeg"]
+            )
+
+    sketch_image = level_sketch_image or _try_load_with_extensions(
+        org_sketch_base, [".png", ".jpg", ".jpeg"]
+    )
+
     return {
-        "montage": _find_image(montage_path),
-        "sketch": _find_image(sketch_path),
+        "montage": _try_load_with_extensions(montage_base, [".png", ".jpg", ".jpeg"]),
+        "sketch": sketch_image,
     }
 
