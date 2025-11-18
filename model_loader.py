@@ -10,7 +10,12 @@ from __future__ import annotations
 import os
 from typing import Dict, List, Optional
 
-import torch
+# Torch is optional in lightweight environments; guard import to avoid
+# crashing when only stub generation is desired.
+try:  # pragma: no cover - small import guard
+    import torch  # type: ignore
+except Exception:  # ImportError or CUDA-related errors
+    torch = None
 
 
 def load_qwen() -> Dict[str, str]:
@@ -22,7 +27,7 @@ def load_qwen() -> Dict[str, str]:
     environment.
     """
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch and torch.cuda.is_available() else "cpu"
     candidates = [
         "Qwen/Qwen2-VL-7B-Instruct",
         "Qwen/Qwen2-VL-2B-Instruct",
