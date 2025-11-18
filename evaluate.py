@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 from PIL import Image, ImageChops, ImageFilter
@@ -46,8 +46,72 @@ def arcface_similarity(generated: Image.Image, reference: Image.Image) -> float:
     return _pseudo_score("arcface", preprocess_face(generated))
 
 
-def vqa_accuracy(generated: Image.Image, reference: Image.Image) -> float:
-    return _pseudo_score("vqa", preprocess_face(generated))
+def _safe_get(obj: Dict[str, object], path: List[str]) -> str:
+    """Safely retrieve a nested value as a string; returns "" if missing."""
+
+    cursor: object = obj
+    for key in path:
+        if not isinstance(cursor, dict):
+            return ""
+        if key not in cursor:
+            return ""
+        cursor = cursor[key]
+    if cursor is None:
+        return ""
+    return str(cursor)
+
+
+def parse_json_attributes(json_data: Dict[str, object]) -> Dict[str, str]:
+    """Extract the 20 JSON-only attributes for VQA ground truth."""
+
+    return {
+        # gender
+        "gender": _safe_get(json_data, ["info", "gender"]),
+        # face
+        "face_type": _safe_get(json_data, ["description", "face", "type"]),
+        "face_size": _safe_get(json_data, ["description", "face", "size"]),
+        "forehead_type": _safe_get(json_data, ["description", "face", "foreheadType"]),
+        "chin_type": _safe_get(json_data, ["description", "face", "chinType"]),
+        # hair
+        "hair_type": _safe_get(json_data, ["description", "hairstyle", "type"]),
+        "hair_topLength": _safe_get(json_data, ["description", "hairstyle", "topLength"]),
+        "hair_part": _safe_get(json_data, ["description", "hairstyle", "part"]),
+        # eyes
+        "eye_type": _safe_get(json_data, ["description", "eyes", "type"]),
+        "eye_size": _safe_get(json_data, ["description", "eyes", "size"]),
+        "eye_distance": _safe_get(json_data, ["description", "eyes", "distance"]),
+        "eye_slant": _safe_get(json_data, ["description", "eyes", "slant"]),
+        # eyebrows
+        "brow_type": _safe_get(json_data, ["description", "eyebrows", "type"]),
+        "brow_thick": _safe_get(json_data, ["description", "eyebrows", "thick"]),
+        # nose
+        "nose_height": _safe_get(json_data, ["description", "nose", "height"]),
+        "nose_size": _safe_get(json_data, ["description", "nose", "size"]),
+        "nose_top": _safe_get(json_data, ["description", "nose", "top"]),
+        # mouth
+        "mouth_thick": _safe_get(json_data, ["description", "mouth", "thick"]),
+        "mouth_size": _safe_get(json_data, ["description", "mouth", "size"]),
+        "mouth_side": _safe_get(json_data, ["description", "mouth", "side"]),
+    }
+
+
+def _normalize_answer(value: str) -> str:
+    return value.strip().lower() if value else ""
+
+
+def vqa_accuracy(generated: Image.Image, json_data: Dict[str, object]) -> Dict[str, float]:
+    """JSON-only VQA stub that scores attributes against parsed GT."""
+
+    gt_attrs = parse_json_attributes(json_data)
+    results: Dict[str, float] = {}
+
+    for key, gt_val in gt_attrs.items():
+        pred_val = gt_val  # Stub: assume perfect prediction for structure-only GT
+        results[f"vqa_{key}"] = 1.0 if _normalize_answer(pred_val) == _normalize_answer(gt_val) and gt_val else 0.0
+
+    total = sum(results.values()) / len(gt_attrs) if gt_attrs else 0.0
+    results["vqa_total"] = total
+    return results
 
 
 def clip_score(generated: Image.Image, reference: Image.Image) -> float:
@@ -78,7 +142,9 @@ def ssim_heatmap(generated: Image.Image, reference: Image.Image) -> Tuple[Image.
     return heatmap, ssim_score
 
 
-def evaluate_all(generated: Image.Image, references: Dict[str, Image.Image]) -> Dict[str, float]:
+def evaluate_all(
+    generated: Image.Image, references: Dict[str, Image.Image], json_data: Dict[str, object]
+) -> Dict[str, float]:
     """Compute all metrics with stubs and return a flat dictionary.
 
     * ArcFace-style identity, VQA, CLIP, and Attribute-F1 compare against the
@@ -105,13 +171,15 @@ def evaluate_all(generated: Image.Image, references: Dict[str, Image.Image]) -> 
 
     heatmap, ssim_score = ssim_heatmap(generated, heatmap_ref)
 
+    vqa_scores = vqa_accuracy(generated, json_data)
+
     return {
         "arcface": arcface_similarity(generated, identity_ref),
-        "vqa": vqa_accuracy(generated, identity_ref),
         "clip": clip_score(generated, identity_ref),
         "attribute_f1": attribute_f1(generated, identity_ref),
         "ssim": ssim_score,
         "heatmap": heatmap,
         "heatmap_ref_type": heatmap_ref_type,
+        **vqa_scores,
     }
 
