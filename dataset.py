@@ -117,6 +117,17 @@ def _find_image(path: str) -> Optional[Image.Image]:
         return None
 
 
+def _try_load_with_extensions(base_path: str, exts: List[str]) -> Optional[Image.Image]:
+    """Load an image by trying multiple extensions in order."""
+
+    for ext in exts:
+        candidate = f"{base_path}{ext}"
+        img = _find_image(candidate)
+        if img is not None:
+            return img
+    return None
+
+
 def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Optional[Image.Image]]:
     """Load ground-truth montage and sketch images if available.
 
@@ -125,21 +136,21 @@ def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Opt
         level: Optional level (L/M/H) to search level-specific sketch images.
     """
 
-    montage_path = os.path.join("data", "images", "montage", f"{person_id}.png")
-    org_sketch_path = os.path.join("data", "images", "org_sketch", f"{person_id}.png")
-    level_sketch_path = (
-        os.path.join("data", "images", "sketch", level, f"{person_id}.png")
+    montage_base = os.path.join("data", "images", "montage", f"{person_id}")
+    org_sketch_base = os.path.join("data", "images", "org_sketch", f"{person_id}")
+    level_sketch_base = (
+        os.path.join("data", "images", "sketch", level, f"{person_id}")
         if level
         else None
     )
 
     sketch_image = None
-    if level_sketch_path:
-        sketch_image = _find_image(level_sketch_path)
-    sketch_image = sketch_image or _find_image(org_sketch_path)
+    if level_sketch_base:
+        sketch_image = _try_load_with_extensions(level_sketch_base, [".png", ".jpg", ".jpeg"])
+    sketch_image = sketch_image or _try_load_with_extensions(org_sketch_base, [".png", ".jpg", ".jpeg"])
 
     return {
-        "montage": _find_image(montage_path),
+        "montage": _try_load_with_extensions(montage_base, [".png", ".jpg", ".jpeg"]),
         "sketch": sketch_image,
     }
 
