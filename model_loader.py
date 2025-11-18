@@ -8,6 +8,7 @@ while preserving the intended API surface.
 from __future__ import annotations
 
 import os
+import logging
 from typing import Dict, List, Optional
 
 # Torch is optional in lightweight environments; guard import to avoid
@@ -16,6 +17,8 @@ try:  # pragma: no cover - small import guard
     import torch  # type: ignore
 except Exception:  # ImportError or CUDA-related errors
     torch = None
+
+logger = logging.getLogger(__name__)
 
 
 def load_qwen() -> Dict[str, str]:
@@ -65,11 +68,16 @@ def get_available_models() -> List[str]:
 
     names: List[str] = []
 
-    try:
-        qwen_cfg = load_qwen()
-        names.append(qwen_cfg["name"])
-    except Exception:
-        pass
+    if torch is None:
+        logger.warning(
+            "PyTorch is not installed; skipping Qwen-VL. Install torch to enable GPU inference."
+        )
+    else:
+        try:
+            qwen_cfg = load_qwen()
+            names.append(qwen_cfg["name"])
+        except Exception:
+            logger.warning("Failed to initialize Qwen-VL; continuing without it.")
 
     gemini_cfg = load_gemini()
     if gemini_cfg:
