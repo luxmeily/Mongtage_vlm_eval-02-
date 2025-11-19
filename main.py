@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -14,7 +15,7 @@ from model_loader import get_available_models
 from prompt_builder import build_common_prefix, build_json_prompt, build_natural_prompt
 
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(os.environ.get("DATA_ROOT", "data"))
 OUTPUT_DIR = Path("outputs")
 
 
@@ -51,9 +52,12 @@ def run_pipeline(seed: int = 1234) -> None:
     from model_loader import get_instructblip_vqa
 
     vqa_bundle = get_instructblip_vqa()
+    checkpoint = vqa_bundle.get("checkpoint", "Salesforce/instructblip-vicuna-7b-small")
     if vqa_bundle.get("available"):
         logging.info(
-            "InstructBLIP VQA loaded (%s) on device %s", "Salesforce/instructblip-vicuna-7b", vqa_bundle.get("device")
+            "InstructBLIP VQA loaded (%s) on device %s",
+            checkpoint,
+            vqa_bundle.get("device"),
         )
     else:
         logging.info(

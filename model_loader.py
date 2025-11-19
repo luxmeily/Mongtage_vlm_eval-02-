@@ -12,6 +12,12 @@ import logging
 from functools import lru_cache
 from typing import Dict, List, Optional
 
+# Per spec, prefer the smallest published checkpoint for InstructBLIP VQA.
+# Default to the "-small" variant while still allowing overrides via env.
+INSTRUCTBLIP_CHECKPOINT = os.environ.get(
+    "INSTRUCTBLIP_CHECKPOINT", "Salesforce/instructblip-vicuna-7b-small"
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,14 +47,20 @@ def get_instructblip_vqa():  # pragma: no cover - heavyweight optional load
         logger.warning(
             "PyTorch missing; VQA will fall back to a stub instead of InstructBLIP."
         )
-        return {"model": None, "processor": None, "device": "cpu", "available": False}
+        return {
+            "model": None,
+            "processor": None,
+            "device": "cpu",
+            "available": False,
+            "checkpoint": INSTRUCTBLIP_CHECKPOINT,
+        }
 
     try:
         from transformers import InstructBlipForConditionalGeneration, InstructBlipProcessor
 
         # Prefer the smallest officially published checkpoint to satisfy the
         # "small" requirement while keeping resource usage reasonable.
-        checkpoint = "Salesforce/instructblip-vicuna-7b"
+        checkpoint = INSTRUCTBLIP_CHECKPOINT
         device = "cuda" if torch_mod.cuda.is_available() else "cpu"
         processor = InstructBlipProcessor.from_pretrained(checkpoint)
         model = InstructBlipForConditionalGeneration.from_pretrained(checkpoint)
@@ -59,13 +71,20 @@ def get_instructblip_vqa():  # pragma: no cover - heavyweight optional load
             "processor": processor,
             "device": device,
             "available": True,
+            "checkpoint": checkpoint,
         }
     except Exception as exc:  # pragma: no cover - best effort load
         logger.warning(
             "Failed to load InstructBLIP for VQA; using stub predictions instead (%s)",
             exc,
         )
-        return {"model": None, "processor": None, "device": "cpu", "available": False}
+        return {
+            "model": None,
+            "processor": None,
+            "device": "cpu",
+            "available": False,
+            "checkpoint": INSTRUCTBLIP_CHECKPOINT,
+        }
 
 
 def load_qwen() -> Dict[str, str]:
