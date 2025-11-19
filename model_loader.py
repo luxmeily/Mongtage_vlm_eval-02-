@@ -121,15 +121,6 @@ def load_gemini() -> Optional[Dict[str, str]]:
     return {"name": "Gemini", "api_key": api_key}
 
 
-def load_gpt4o() -> Dict[str, str]:
-    """Return a descriptor for GPT-4o usage."""
-
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    # Placeholder: pipeline treats absence of key as still selectable but
-    # generation will fallback to stub behavior.
-    return {"name": "GPT-4o", "api_key": api_key}
-
-
 def get_available_models() -> List[str]:
     """Enumerate available model names based on the environment."""
 
@@ -151,8 +142,11 @@ def get_available_models() -> List[str]:
     if gemini_cfg:
         names.append(gemini_cfg["name"])
 
-    # GPT-4o is always listed for parity, even if API key is missing.
-    names.append(load_gpt4o()["name"])
+    include_gpt4o = os.environ.get("ENABLE_GPT4O", "0").lower() in {"1", "true", "yes"}
+    if include_gpt4o:
+        names.append("GPT-4o")
+    else:
+        logger.info("GPT-4o disabled (set ENABLE_GPT4O=1 to include it)")
 
     return names
 

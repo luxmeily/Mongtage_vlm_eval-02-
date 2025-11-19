@@ -1,0 +1,9 @@
+# Core dependencies for the montage evaluation pipeline
+pillow>=9.0.0
+numpy>=1.23.0
+
+# VQA (InstructBLIP) support
+transformers>=4.38.0
+# PyTorch is required for InstructBLIP; choose the build that matches your system
+# Example (CUDA 12.1): pip install torch --extra-index-url https://download.pytorch.org/whl/cu121
+# Example (CPU only):  pip install torch==2.2.2
