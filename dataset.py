@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Optional
 from PIL import Image
 
 
+DATA_ROOT = Path(os.environ.get("DATA_ROOT", "data"))
+
+
 def load_json(path: str) -> Dict[str, Any]:
     """Load a JSON file from disk.
 
@@ -155,10 +158,10 @@ def load_gt_images(person_id: str, level: Optional[str] = None) -> Dict[str, Opt
         level: Optional level (L/M/H) to search level-specific sketch images.
     """
 
-    montage_base = os.path.join("data", "images", "montage", f"{person_id}")
-    org_sketch_base = os.path.join("data", "images", "org_sketch", f"{person_id}")
+    montage_base = str(DATA_ROOT / "images" / "montage" / f"{person_id}")
+    org_sketch_base = str(DATA_ROOT / "images" / "org_sketch" / f"{person_id}")
 
-    level_sketch_folder = Path("data") / "images" / "sketch"
+    level_sketch_folder = DATA_ROOT / "images" / "sketch"
     level_sketch_image: Optional[Image.Image] = None
     if level:
         level_folder = level_sketch_folder / level

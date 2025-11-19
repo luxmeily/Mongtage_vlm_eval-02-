@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -14,7 +15,7 @@ from model_loader import get_available_models
 from prompt_builder import build_common_prefix, build_json_prompt, build_natural_prompt
 
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(os.environ.get("DATA_ROOT", "data"))
 OUTPUT_DIR = Path("outputs")
 
 
